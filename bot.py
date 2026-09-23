@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 from html import escape
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 import aiosqlite
 from aiogram import Bot, Dispatcher, F
@@ -156,7 +156,7 @@ async def edit_screen(message: Message, text: str, reply_markup=None, image_path
             return await message.edit_caption(caption=text, reply_markup=reply_markup)
         return await message.edit_text(text, reply_markup=reply_markup)
     except Exception:
-        pass  # Игнорируем ошибку, если контент сообщения не изменился
+        pass
 
 
 IMAGE_MAIN = "welcome.png"
@@ -336,6 +336,7 @@ async def stars_package(callback: CallbackQuery, state: FSMContext):
 GRAM_RATE = Decimal("124.31")
 GRAM_MIN = 1
 GRAM_MAX = 200
+USD_RUB_RATE = Decimal("95.0")
 
 
 def ton_type_keyboard():
@@ -669,11 +670,28 @@ def payment_keyboard(back_callback: str):
 
 
 @dp.callback_query(F.data.startswith("pay:"))
-async def payment_method(callback: CallbackQuery):
+async def payment_method(callback: CallbackQuery, state: FSMContext):
     parts = callback.data.split(":")
     method = parts[1]
     order_info = ":".join(parts[2:])
     await callback.answer()
+
+    rub_amount = Decimal("0")
+    try:
+        if "star" in order_info or "roblox" in order_info or "premium" in order_info:
+            rub_amount = Decimal(parts[-1])
+        elif "ton:order" in order_info:
+            rub_amount = Decimal(parts[3])
+    except Exception:
+        pass
+
+    current_image = IMAGE_STARS
+    if "ton" in order_info:
+        current_image = IMAGE_TON
+    elif "premium" in order_info:
+        current_image = IMAGE_PREMIUM
+    elif "roblox" in order_info:
+        current_image = IMAGE_ROBLOX
 
     if method == "card":
         text = (
@@ -683,20 +701,19 @@ async def payment_method(callback: CallbackQuery):
             "После перевода нажмите кнопку ниже для отправки чека/заказа администратору."
         )
     else:
+        usd_amount = (rub_amount / USD_RUB_RATE).quantize(Decimal("0.01")) if rub_amount > 0 else Decimal("0")
+        ton_amount_calc = (rub_amount / GRAM_RATE).quantize(Decimal("0.01")) if rub_amount > 0 else Decimal("0")
+
         text = (
             "💎 <b>Оплата в TON</b>\n\n"
+            "💰 <b>Сумма к оплате:</b>\n"
+            f"• <b>{rub_amount} ₽</b>\n"
+            f"• <b>~${usd_amount} USD</b>\n"
+            f"• <b>~{ton_amount_calc} TON (GRAM)</b>\n\n"
             "Переведите точную сумму на TON-адрес:\n\n"
             f"💎 <code>{escape(TON_WALLET)}</code>\n\n"
             "После перевода нажмите кнопку ниже для подтверждения."
         )
-
-    current_image = IMAGE_STARS
-    if "ton" in order_info:
-        current_image = IMAGE_TON
-    elif "premium" in order_info:
-        current_image = IMAGE_PREMIUM
-    elif "roblox" in order_info:
-        current_image = IMAGE_ROBLOX
 
     await edit_screen(
         callback.message,
