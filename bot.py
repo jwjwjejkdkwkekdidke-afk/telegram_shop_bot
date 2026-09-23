@@ -140,20 +140,23 @@ WELCOME = """✨ <b>Добро пожаловать!</b>
 
 
 async def edit_screen(message: Message, text: str, reply_markup=None, image_path=None):
-    if image_path and os.path.exists(image_path):
-        if message.photo:
-            return await message.edit_media(
-                media=InputMediaPhoto(media=FSInputFile(image_path), caption=text),
+    try:
+        if image_path and os.path.exists(image_path):
+            if message.photo:
+                return await message.edit_media(
+                    media=InputMediaPhoto(media=FSInputFile(image_path), caption=text),
+                    reply_markup=reply_markup,
+                )
+            return await message.answer_photo(
+                photo=FSInputFile(image_path),
+                caption=text,
                 reply_markup=reply_markup,
             )
-        return await message.answer_photo(
-            photo=FSInputFile(image_path),
-            caption=text,
-            reply_markup=reply_markup,
-        )
-    if message.photo:
-        return await message.edit_caption(caption=text, reply_markup=reply_markup)
-    return await message.edit_text(text, reply_markup=reply_markup)
+        if message.photo:
+            return await message.edit_caption(caption=text, reply_markup=reply_markup)
+        return await message.edit_text(text, reply_markup=reply_markup)
+    except Exception:
+        pass  # Игнорируем ошибку, если контент сообщения не изменился
 
 
 IMAGE_MAIN = "welcome.png"
@@ -288,7 +291,7 @@ async def stars_friend_username(message: Message, state: FSMContext):
         username = "@" + username.lstrip("@")
     await state.clear()
 
-    await state.update_data(friend_username=username) # Сохраняем в state
+    await state.update_data(friend_username=username)
 
     text = (
         "⭐ <b>Покупка звёзд</b>\n\n"
@@ -535,7 +538,6 @@ async def premium_friend_username(message: Message, state: FSMContext):
 @dp.callback_query(F.data.startswith("premium:package:"))
 async def premium_package(callback: CallbackQuery, state: FSMContext):
     parts = callback.data.split(":")
-    # callback_data формата: premium:package:{recipient}:{price}:{username}
     recipient = parts[2]
     price = parts[3]
     username = parts[4] if len(parts) > 4 else ""
@@ -719,7 +721,6 @@ async def confirm_payment_user(callback: CallbackQuery):
     order_info = ":".join(order_parts)
     user = callback.from_user
 
-    # Формируем читаемое описание товара из callback_data
     details = f"Способ оплаты: {'Карта' if method == 'card' else 'TON'}\nДанные заказа: <code>{escape(order_info)}</code>"
 
     admin_text = (
