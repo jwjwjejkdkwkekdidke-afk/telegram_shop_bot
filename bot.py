@@ -143,18 +143,33 @@ async def edit_screen(message: Message, text: str, reply_markup=None, image_path
     try:
         if image_path and os.path.exists(image_path):
             if message.photo:
-                return await message.edit_media(
-                    media=InputMediaPhoto(media=FSInputFile(image_path), caption=text),
-                    reply_markup=reply_markup,
-                )
+                try:
+                    return await message.edit_media(
+                        media=InputMediaPhoto(media=FSInputFile(image_path), caption=text),
+                        reply_markup=reply_markup,
+                    )
+                except Exception:
+                    try:
+                        return await message.edit_caption(caption=text, reply_markup=reply_markup)
+                    except Exception:
+                        pass
+                return
             return await message.answer_photo(
                 photo=FSInputFile(image_path),
                 caption=text,
                 reply_markup=reply_markup,
             )
+        
         if message.photo:
-            return await message.edit_caption(caption=text, reply_markup=reply_markup)
-        return await message.edit_text(text, reply_markup=reply_markup)
+            try:
+                return await message.edit_caption(caption=text, reply_markup=reply_markup)
+            except Exception:
+                pass
+        else:
+            try:
+                return await message.edit_text(text, reply_markup=reply_markup)
+            except Exception:
+                pass
     except Exception:
         pass
 
